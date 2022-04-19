@@ -309,7 +309,11 @@ class Errors
     static constexpr int dim
         = std::decay_t<decltype(std::declval<MomentumProblem>().gridGeometry())>::GridView::dimension;
 
-    using ErrorVector = Dune::FieldVector<Scalar, dim+1>;
+    static constexpr bool isCompositional = MassProblem::ModelTraits::numFluidComponents() > 1;
+    static constexpr int numComponentBalance = MassProblem::ModelTraits::numFluidComponents() - 1;
+
+    // one velocity variable per dimension, one pressure variable, one variable per component balance
+    using ErrorVector = Dune::FieldVector<Scalar, dim + 1 + numComponentBalance>;
 
 public:
     template<class SolutionVector>
@@ -420,6 +424,39 @@ private:
             }
         }
 
+        // compositional errors
+        if constexpr (isCompositional)
+        {
+            auto fvGeometry = localView(massProblem_->gridGeometry());
+            for (const auto& element : elements(massProblem_->gridGeometry().gridView()))
+            {
+                fvGeometry.bindElement(element);
+                for (const auto& scv : scvs(fvGeometry))
+                {
+                    using GridGeometry = std::decay_t<decltype(std::declval<MomentumProblem>().gridGeometry())>;
+                    using Extrusion = Extrusion_t<GridGeometry>;
+                    totalVolume += Extrusion::volume(scv);
+
+                    for (int compIdx = 1; compIdx < numComponentBalance+1; compIdx++)
+                    {
+                        // compute the compositional errors
+                        using Indices = typename MassProblem::Indices;
+                        const auto analyticalSolution
+                            = massProblem_->analyticalSolution(scv.dofPosition(), time)[Indices::conti0EqIdx + compIdx];
+                        const auto numericalSolution
+                            = curSol[_1][scv.dofIndex()][Indices::conti0EqIdx + compIdx];
+
+                        const Scalar cError = absDiff_(analyticalSolution, numericalSolution);
+                        const Scalar cReference = absDiff_(analyticalSolution, 0.0);
+
+                        maxError[dim+1] = std::max(maxError[dim+1], cError);
+                        maxReference[dim+1] = std::max(maxReference[dim+1], cReference);
+                        sumError[dim+1] += cError * cError * Extrusion::volume(scv);
+                        sumReference[dim+1] += cReference * cReference * Extrusion::volume(scv);
+                    }
+                }
+            }
+        }
         // calculate errors
         for (int i = 0; i < ErrorVector::size(); ++i)
         {
@@ -462,6 +499,9 @@ class ErrorCSVWriter
     static constexpr int dim
         = std::decay_t<decltype(std::declval<MomentumProblem>().gridGeometry())>::GridView::dimension;
 
+    static constexpr bool isCompositional = MassProblem::ModelTraits::numFluidComponents() > 1;
+    static constexpr int numComponentBalance = MassProblem::ModelTraits::numFluidComponents() - 1;
+
 public:
     ErrorCSVWriter(std::shared_ptr<const MomentumProblem> momentumProblem,
                    std::shared_ptr<const MassProblem> massProblem,
@@ -474,16 +514,15 @@ public:
         // print auxiliary file with the number of dofs
         std::ofstream logFileDofs(name_ + "_dofs.csv", std::ios::trunc);
         logFileDofs << "cc dofs, face dofs, all dofs\n"
-                    << numCCDofs << numFaceDofs << numCCDofs + numFaceDofs << "\n";
+                    << numCCDofs << ", " << numFaceDofs << ", " << numCCDofs + numFaceDofs << "\n";
 
         // clear error file
         std::ofstream logFile(name_ + ".csv", std::ios::trunc);
 
         // write header
         logFile << "time";
-        using ErrorNames = std::vector<std::string>;
         for (const std::string e : { "L2Abs", "L2Rel", "LinfAbs", "LinfRel" })
-            printError_(logFile, ErrorNames({ e + "(p)", e + "(u)", e + "(v)", e + "(w)" }), "{:s}");
+            printError_(logFile, errorNames_(e), "{:s}");
         logFile << "\n";
     }
 
@@ -509,7 +548,27 @@ private:
         using MomIndices = typename MomentumProblem::Indices;
         logFile << Fmt::format(", " + format, error[MassIndices::pressureIdx]);
         for (int dirIdx = 0; dirIdx < dim; ++dirIdx)
-            logFile << Fmt::format(", " + format, error[MomIndices::velocity(dirIdx)]);
+            logFile << Fmt::format(", " + format, error[MomIndices::velocity(dirIdx)+1]);
+
+        if constexpr (isCompositional)
+            logFile << Fmt::format(", " + format, error[dim+1]);
+    }
+
+
+    std::vector<std::string> errorNames_(const std::string& e) const
+    {
+        std::vector<std::string> errorNames = { e + "(p)", e + "(u)" };
+        if constexpr (dim >= 2)
+            errorNames.push_back( e + "(v)");
+        else if (dim == 3)
+            errorNames.push_back(e + "(w)");
+        else
+        {}
+
+        if constexpr (isCompositional)
+            errorNames.push_back(e + "(c)");
+
+        return errorNames;
     }
 
     std::string name_;
@@ -535,19 +594,31 @@ void convergenceTestAppendErrors(std::ofstream& logFile,
 {
     const auto numCCDofs = massProblem->gridGeometry().numDofs();
     const auto numFaceDofs = momentumProblem->gridGeometry().numDofs();
+    static constexpr bool isCompositional = MassProblem::ModelTraits::numFluidComponents() > 1;
 
     logFile << Fmt::format(
-        "[ConvergenceTest] numCCDofs = {} numFaceDofs = {}",
+        "[ConvergenceTest] numCCDofs = {0} numFaceDofs = {1} \n",
         numCCDofs, numFaceDofs
     );
 
     const auto print = [&](const auto& e, const std::string& name){
         using MassIndices = typename MassProblem::Indices;
         using MomIndices = typename MomentumProblem::Indices;
-        logFile << Fmt::format(
-            " {0}(p) = {1} {0}(vx) = {2} {0}(vy) = {3}",
-            name, e[MassIndices::pressureIdx], e[MomIndices::velocityXIdx], e[MomIndices::velocityYIdx]
-        );
+        if (isCompositional)
+        {
+            logFile << Fmt::format(" {0}(p) = {1} {0}(vx) = {2} {0}(vy) = {3} {0}(c) = {4} \n",
+                                   name, e[MassIndices::pressureIdx],
+                                         e[MomIndices::velocityXIdx+1],
+                                         e[MomIndices::velocityYIdx+1],
+                                         e[MomIndices::velocityYIdx+2]);
+        }
+        else
+        {
+            logFile << Fmt::format(" {0}(p) = {1} {0}(vx) = {2} {0}(vy) = {3} \n",
+                                   name, e[MassIndices::pressureIdx],
+                                         e[MomIndices::velocityXIdx+1],
+                                         e[MomIndices::velocityYIdx+1]);
+        }
     };
 
     print(errors.l2Absolute(), "L2Abs");
@@ -556,6 +627,7 @@ void convergenceTestAppendErrors(std::ofstream& logFile,
     print(errors.lInfRelative(), "LinfRel");
 
     logFile << "\n";
+    logFile.close();
 }
 
 
@@ -568,7 +640,8 @@ void convergenceTestAppendErrors(std::shared_ptr<MomentumProblem> momentumProble
                                  const Errors<MomentumProblem, MassProblem>& errors)
 {
     const auto logFileName = massProblem->name() + ".log";
-    std::ofstream logFile(logFileName, std::ios::app);
+    std::ofstream logFile;
+    logFile.open(logFileName, std::ios::app);
     convergenceTestAppendErrors(logFile, momentumProblem, massProblem, errors);
 }
 
