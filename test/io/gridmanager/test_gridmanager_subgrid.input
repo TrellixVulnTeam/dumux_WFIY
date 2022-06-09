@@ -20,4 +20,9 @@ Refinement = 4
 LowerLeft = 1 1
 UpperRight = 5 2
 Cells = 100 25
-Image = grids/dumux_binary.pbm
+Image = ./grids/dumux_binary.pbm
+
+[SPGrid.Grid]
+File = periodic.dgf
+LowerLeft = 0 0
+UpperRight = 1 1
