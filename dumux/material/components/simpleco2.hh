@@ -20,7 +20,7 @@
  * \file
  * \ingroup Components
  * \brief A much simpler (and thus potentially less buggy) version of
- *        pure water.
+ *        pure CO2.
  */
 #ifndef DUMUX_SIMPLE_CO2_HH
 #define DUMUX_SIMPLE_CO2_HH
@@ -37,7 +37,7 @@ namespace Dumux::Components {
 
 /*!
  * \ingroup Components
- * \brief A simple version of pure water
+ * \brief A simple version of pure CO2
  *
  * \tparam Scalar The type used for scalar values
  */
@@ -48,11 +48,11 @@ class SimpleCO2
 {
     using IdealGas = Dumux::IdealGas<Scalar>;
 
-    static const Scalar R;  // specific gas constant of water
+    static const Scalar R;  // specific gas constant of CO2
 
 public:
     /*!
-     * \brief A human readable name for the water.
+     * \brief A human readable name for the CO2.
      */
     static std::string name()
     { return "SimpleCO2"; }
@@ -76,7 +76,7 @@ public:
     { return 73.8e5; /* [Pa] */ }
 
     /*!
-     * \brief Returns the temperature \f$\mathrm{[K]}\f$ at water's triple point.
+     * \brief Returns the temperature \f$\mathrm{[K]}\f$ at CO2's triple point.
      */
     static Scalar tripleTemperature()
     { return 273.15 - 56.35; /* [K] */ }
@@ -175,13 +175,62 @@ public:
 
     /*!
      * \brief The dynamic viscosity \f$\mathrm{[Pa*s]}\f$ of CO2.
-     *
+     * Equations given in: - Vesovic et al., 1990
+     *                     - Fenhour et al., 1998
      * \param temperature temperature of component in \f$\mathrm{[K]}\f$
      * \param pressure pressure of component in \f$\mathrm{[Pa]}\f$
+     * TODO: this does not look like a really "simple" parameterization. Can this be simplified further?
      */
     static Scalar gasViscosity(Scalar temperature, Scalar pressure)
     {
-        return 1e-05;  //TODO!! "complex CO2's gas viscosity looks too complicated
+        static const double a0 = 0.235156;
+        static const double a1 = -0.491266;
+        static const double a2 = 5.211155E-2;
+        static const double a3 = 5.347906E-2;
+        static const double a4 = -1.537102E-2;
+
+        static const double d11 = 0.4071119E-2;
+        static const double d21 = 0.7198037E-4;
+        static const double d64 = 0.2411697E-16;
+        static const double d81 = 0.2971072E-22;
+        static const double d82 = -0.1627888E-22;
+
+        static const double ESP = 251.196;
+
+        double mu0, SigmaStar, TStar;
+        double dmu, rho;
+        double visco_CO2;
+
+        if(temperature < 275.) // regularisation
+        {
+            temperature = 275;
+            Dune::dgrave << "Temperature below 275K in viscosity function:"
+                    << "Regularizing tempereature to 275K. " << std::endl;
+        }
+
+
+        TStar = temperature/ESP;
+
+        /* mu0: viscosity in zero-density limit */
+        using std::exp;
+        using std::log;
+        using std::sqrt;
+        SigmaStar = exp(a0 + a1*log(TStar)
+                        + a2*log(TStar)*log(TStar)
+                        + a3*log(TStar)*log(TStar)*log(TStar)
+                        + a4*log(TStar)*log(TStar)*log(TStar)*log(TStar) );
+        mu0 = 1.00697*sqrt(temperature) / SigmaStar;
+
+        /* dmu : excess viscosity at elevated density */
+        rho = gasDensity(temperature, pressure); /* CO2 mass density [kg/m^3] */
+
+        using Dune::power;
+        dmu = d11*rho + d21*rho*rho + d64*power(rho,6)/(TStar*TStar*TStar)
+            + d81*power(rho,8) + d82*power(rho,8)/TStar;
+
+        visco_CO2 = (mu0 + dmu)/1.0E6;   /* conversion to [Pa s] */
+
+        return visco_CO2;
     }
 
 
