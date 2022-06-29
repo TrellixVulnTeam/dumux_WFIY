@@ -98,7 +98,7 @@ public:
                                     Scalar pressure)
     {
         static const Scalar tRef = getParam<Scalar>("SimpleCO2.ReferenceTemperature", 293.15);
-        return gasHeatCapacity(temperature, pressure)*(temperature - tRef) + vaporizationEnthalpy();
+        return gasHeatCapacity(temperature, pressure)*(temperature - tRef); // + vaporizationEnthalpy();
     }
 
     /*!
@@ -256,7 +256,7 @@ public:
      */
     static Scalar gasHeatCapacity(Scalar temperature, Scalar pressure)
     {
-        return 2.08e3;  //TODO!!
+        return 850;  //TODO!! from old simpleco2.hh file.
     }
 
 };
