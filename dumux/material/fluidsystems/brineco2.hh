@@ -35,7 +35,7 @@
 #include <dumux/material/fluidstates/adapter.hh>
 
 #include <dumux/material/components/brine.hh>
-#include <dumux/material/components/co2.hh>
+#include <dumux/material/components/simpleco2.hh>
 #include <dumux/material/components/tabulatedcomponent.hh>
 
 #include <dumux/material/binarycoefficients/brine_co2.hh>
@@ -105,18 +105,18 @@ struct BrineCO2DefaultPolicy
  * \note This implementation always assumes NaCl stays in the liquid phase.
  */
 template< class Scalar,
-          class CO2Table,
+          class CO2Impl = Components::SimpleCO2<Scalar>,
           class H2OType = Components::TabulatedComponent<Components::H2O<Scalar>>,
           class Policy = BrineCO2DefaultPolicy</*constantSalinity?*/true> >
 class BrineCO2
-: public Base<Scalar, BrineCO2<Scalar, CO2Table, H2OType, Policy>>
+: public Base<Scalar, BrineCO2<Scalar, CO2Impl, H2OType, Policy>>
 , public Detail::BrineCO2Indices<Policy::useConstantSalinity()>
 {
-    using ThisType = BrineCO2<Scalar, CO2Table, H2OType, Policy>;
+    using ThisType = BrineCO2<Scalar, CO2Impl, H2OType, Policy>;
     using Base = Dumux::FluidSystems::Base<Scalar, ThisType>;
 
     // binary coefficients
-    using Brine_CO2 = BinaryCoeff::Brine_CO2<Scalar, CO2Table>;
+    using Brine_CO2 = BinaryCoeff::Brine_CO2<Scalar, CO2Impl>;
 
     // use constant salinity brine?
     static constexpr bool useConstantSalinity = Policy::useConstantSalinity();
@@ -145,7 +145,7 @@ public:
 
     using H2O = H2OType;
     using Brine = BrineType;
-    using CO2 = Dumux::Components::CO2<Scalar, CO2Table>;
+    using CO2 = CO2Impl;
 
     static constexpr int numComponents = useConstantSalinity ? 2 : 3;
     static constexpr int numPhases = 2;
