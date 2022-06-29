@@ -262,9 +262,6 @@ public:
 };
 
 template <class Scalar>
-struct IsAqueous<SimpleCO2<Scalar>> : public std::true_type {};  //TODO Do we need this actually? What does it do?
-
-template <class Scalar>
 const Scalar Components::SimpleCO2<Scalar>::R = Constants<Scalar>::R / Components::SimpleCO2<Scalar>::molarMass();
 
 } // end namespace Dumux::Components
