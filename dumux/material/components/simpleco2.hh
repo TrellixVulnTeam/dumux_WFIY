@@ -181,7 +181,7 @@ public:
      */
     static Scalar gasViscosity(Scalar temperature, Scalar pressure)
     {
-        return 1e-05;  //TODO!!
+        return 1e-05;  //TODO!! "complex CO2's gas viscosity looks too complicated
     }
 
 
@@ -216,7 +216,7 @@ template <class Scalar>
 struct IsAqueous<SimpleCO2<Scalar>> : public std::true_type {};  //TODO Do we need this actually? What does it do?
 
 template <class Scalar>
-const Scalar Components::SimpleCO2<Scalar>::R = Constants<Scalar>::R / 18e-3;
+const Scalar Components::SimpleCO2<Scalar>::R = Constants<Scalar>::R / 44e-3;
 
 } // end namespace Dumux::Components
 
