@@ -34,6 +34,9 @@
 #include <dumux/discretization/method.hh>
 #include <dumux/flux/referencesystemformulation.hh>
 
+#include <dumux/porousmediumflow/fluxcontext.hh>
+#include <dumux/porousmediumflow/flux.hh>
+
 namespace Dumux {
 
 /*!
@@ -52,7 +55,6 @@ class CompositionalLocalResidual: public GetPropType<TypeTag, Properties::BaseLo
     using SubControlVolume = typename FVElementGeometry::SubControlVolume;
     using SubControlVolumeFace = typename FVElementGeometry::SubControlVolumeFace;
     using NumEqVector = Dumux::NumEqVector<GetPropType<TypeTag, Properties::PrimaryVariables>>;
-    using FluxVariables = GetPropType<TypeTag, Properties::FluxVariables>;
     using ElementFluxVariablesCache = typename GetPropType<TypeTag, Properties::GridFluxVariablesCache>::LocalView;
     using GridView = typename GetPropType<TypeTag, Properties::GridGeometry>::GridView;
     using Element = typename GridView::template Codim<0>::Entity;
@@ -146,8 +148,9 @@ public:
                             const SubControlVolumeFace& scvf,
                             const ElementFluxVariablesCache& elemFluxVarsCache) const
     {
-        FluxVariables fluxVars;
-        fluxVars.init(problem, element, fvGeometry, elemVolVars, scvf, elemFluxVarsCache);
+        const auto fluxContext = PorousMediumFluxContext(problem, element, fvGeometry, elemVolVars, scvf, elemFluxVarsCache);
+        PorousMediumFlux<TypeTag> fluxHelper;
+
         static constexpr auto referenceSystemFormulation = FluxVariables::MolecularDiffusionType::referenceSystemFormulation();
         // get upwind weights into local scope
         NumEqVector flux(0.0);
@@ -161,7 +164,7 @@ public:
         // advective fluxes
         for (int phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx)
         {
-            const auto diffusiveFluxes = fluxVars.molecularDiffusionFlux(phaseIdx);
+            const auto diffusiveFluxes = fluxHelper.molecularDiffusionFlux(phaseIdx, fluxContext);
             for (int compIdx = 0; compIdx < numComponents; ++compIdx)
             {
                 // get equation index
@@ -172,7 +175,7 @@ public:
                 { return massOrMoleDensity(volVars, phaseIdx)*massOrMoleFraction(volVars, phaseIdx, compIdx)*volVars.mobility(phaseIdx); };
 
                 if (eqIdx != replaceCompEqIdx)
-                    flux[eqIdx] += fluxVars.advectiveFlux(phaseIdx, upwindTerm);
+                    flux[eqIdx] += fluxHelper.advectiveFlux(phaseIdx, upwindTerm, fluxContext);
 
                 // diffusive fluxes (only for the component balances)
                 if(eqIdx != replaceCompEqIdx)
@@ -196,7 +199,7 @@ public:
                 const auto upwindTerm = [&massOrMoleDensity, phaseIdx] (const auto& volVars)
                 { return massOrMoleDensity(volVars, phaseIdx)*volVars.mobility(phaseIdx); };
 
-                flux[replaceCompEqIdx] += fluxVars.advectiveFlux(phaseIdx, upwindTerm);
+                flux[replaceCompEqIdx] += fluxHelper.advectiveFlux(phaseIdx, upwindTerm, fluxContext);
 
                 for(int compIdx = 0; compIdx < numComponents; ++compIdx)
                 {
@@ -212,31 +215,26 @@ public:
             }
 
             //! Add advective phase energy fluxes. For isothermal model the contribution is zero.
-            EnergyLocalResidual::heatConvectionFlux(flux, fluxVars, phaseIdx);
+            EnergyLocalResidual::heatConvectionFlux(flux, fluxHelper, fluxContext, phaseIdx);
 
-            if constexpr (Deprecated::hasEnableCompositionalDispersion<ModelTraits>())
+            if constexpr (ModelTraits::enableCompositionalDispersion())
             {
-                if constexpr (ModelTraits::enableCompositionalDispersion())
+                if constexpr (FVElementGeometry::GridGeometry::discMethod == DiscretizationMethods::box && numPhases == 1)
                 {
-                    if constexpr (FVElementGeometry::GridGeometry::discMethod == DiscretizationMethods::box && numPhases == 1)
+                    const auto dispersionFluxes = fluxHelper.compositionalDispersionFlux(phaseIdx, fluxContext);
+                    for (int compIdx = 0; compIdx < numComponents; ++compIdx)
                     {
-                        const auto dispersionFluxes = fluxVars.compositionalDispersionFlux(phaseIdx);
-                        for (int compIdx = 0; compIdx < numComponents; ++compIdx)
-                        {
-                            flux[compIdx] += dispersionFluxes[compIdx];
-                        }
+                        flux[compIdx] += dispersionFluxes[compIdx];
                     }
-                    else
-                        DUNE_THROW(Dune::NotImplemented, "Dispersion Fluxes are only implemented for single phase flows using the Box method.");
                 }
+                else
+                    DUNE_THROW(Dune::NotImplemented, "Dispersion Fluxes are only implemented for single phase flows using the Box method.");
             }
-            else
-                enableCompositionalDispersionMissing_<ModelTraits>();
         }
 
         //! Add diffusive and dispersive energy fluxes. For isothermal model the contribution is zero.
-        EnergyLocalResidual::heatConductionFlux(flux, fluxVars);
-        EnergyLocalResidual::heatDispersionFlux(flux, fluxVars);
+        EnergyLocalResidual::heatConductionFlux(flux, fluxHelper, fluxContext);
+        EnergyLocalResidual::heatDispersionFlux(flux, fluxHelper, fluxContext);
 
         return flux;
     }
@@ -247,11 +245,6 @@ protected:
 
     const Implementation *asImp_() const
     { return static_cast<const Implementation *> (this); }
-
-    template <class T = ModelTraits>
-    [[deprecated("All compositional models must specifiy if dispersion is enabled."
-                 "Please add enableCompositionalDispersion to the ModelTraits in your model header.")]]
-    void enableCompositionalDispersionMissing_() const {}
 };
 
 } // end namespace Dumux
