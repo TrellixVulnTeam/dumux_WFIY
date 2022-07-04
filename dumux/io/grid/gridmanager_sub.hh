@@ -244,6 +244,8 @@ public:
             if (std::accumulate(cells.begin(), cells.end(), 1, std::multiplies<int>{}) != buffer.size())
                 DUNE_THROW(Dune::IOError, "Grid dimensions doesn't match number of cells specified");
 
+            postProcessBinaryMask_(buffer, cells, paramGroup);
+
             using GlobalPosition = typename ParentType::Grid::template Codim<0>::Geometry::GlobalCoordinate;
             const auto lowerLeft = GlobalPosition(0.0);
             const auto upperRight = [&]{
@@ -342,6 +344,84 @@ private:
         this->gridPtr() = this->createGrid_(this->hostGrid_(), elementSelector, paramGroup);
 
         this->loadBalance();
+    }
+
+private:
+    void postProcessBinaryMask_(std::vector<char>& mask, const std::array<int, dim>& cells, const std::string& paramGroup) const
+    {
+        if (hasParamInGroup(paramGroup, "Grid.KeepOnlyConnected"))
+        {
+            std::vector<int> marker(mask.size(), 0);
+
+            std::string direction = getParamFromGroup<std::string>(paramGroup, "Grid.KeepOnlyConnected");
+            if (direction == "Y")
+            {
+                std::cout << "Keeping only cells connected to both boundaries in y-direction" << std::endl;
+                for (int i = 0; i < cells[0]; ++i)
+                    for (int k = 0; k < cells[2]; ++k)
+                        fill_(mask, marker, cells, i, 0, k, 1);
+
+                for (int i = 0; i < cells[0]; ++i)
+                    for (int k = 0; k < cells[2]; ++k)
+                        fill_(mask, marker, cells, i, cells[1]-1, k, 2);
+            }
+            else if (direction == "Z")
+            {
+                std::cout << "Keeping only cells connected to both boundaries in z-direction" << std::endl;
+                for (int i = 0; i < cells[0]; ++i)
+                    for (int j = 0; j < cells[1]; ++j)
+                        fill_(mask, marker, cells, i, j, 0, 1);
+
+                for (int i = 0; i < cells[0]; ++i)
+                    for (int j = 0; j < cells[1]; ++j)
+                        fill_(mask, marker, cells, i, j, cells[2]-1, 2);
+            }
+            else
+            {
+                std::cout << "Keeping only cells connected to both boundaries in x-direction" << std::endl;
+                for (int j = 0; j < cells[1]; ++j)
+                    for (int k = 0; k < cells[2]; ++k)
+                        fill_(mask, marker, cells, 0, j, k, 1);
+
+                for (int j = 0; j < cells[1]; ++j)
+                    for (int k = 0; k < cells[2]; ++k)
+                        fill_(mask, marker, cells, cells[0]-1, j, k, 2);
+            }
+
+            for (int i = 0; i < cells[0]; ++i)
+            {
+                for (int j = 0; j < cells[1]; ++j)
+                {
+                    for (int k = 0; k < cells[2]; ++k)
+                    {
+                        const int ijk = getIJK_(i, j, k, cells);
+                        if (marker[ijk] != 2)
+                            mask[ijk] = false;
+                    }
+                }
+            }
+        }
+    }
+
+    void fill_(std::vector<char>& mask, std::vector<int>& marker, const std::array<int, dim>& cells, int i, int j, int k, int m) const
+    {
+        const int ijk = getIJK_(i, j, k, cells);
+        if (ijk >= mask.size() || !mask[ijk] || marker[ijk] >= m)
+            return;
+
+        marker[ijk] += 1;
+
+        fill_(mask, marker, cells, i+1, j, k, m);
+        fill_(mask, marker, cells, i, j+1, k, m);
+        fill_(mask, marker, cells, i-1, j, k, m);
+        fill_(mask, marker, cells, i, j-1, k, m);
+        fill_(mask, marker, cells, i, j, k+1, m);
+        fill_(mask, marker, cells, i, j, k-1, m);
+    }
+
+    int getIJK_(int i, int j, int k, const std::array<int, dim>& cells) const
+    {
+        return i + j*cells[0] + k*cells[0]*cells[1];
     }
 };
 
