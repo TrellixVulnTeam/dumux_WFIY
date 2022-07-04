@@ -321,7 +321,7 @@ public:
 
         return source;
     }
- };
+};
 
 } // end namespace Dumux
 
