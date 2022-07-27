@@ -48,8 +48,6 @@ class SimpleCO2
 {
     using IdealGas = Dumux::IdealGas<Scalar>;
 
-    static const Scalar R;  // specific gas constant of CO2
-
     static constexpr Scalar limitPressure = 10.0e5; // [Pa]
 
 public:
@@ -63,7 +61,7 @@ public:
      * \brief The mass in \f$\mathrm{[kg/mol]}\f$ of one mole of CO2.
      */
     static constexpr Scalar molarMass()
-    { return 44e-3; /* [kg/mol] */ }
+    { return 44.0e-3; /* [kg/mol] */ }
 
     /*!
      * \brief Returns the critical temperature \f$\mathrm{[K]}\f$ of CO2
@@ -124,7 +122,7 @@ public:
         // 1/molarMass: conversion from [J/(mol K)] to [J/(kg K)]
         // R*T/molarMass: pressure *spec. volume for an ideal gas
         return gasEnthalpy(temperature, pressure)
-                - 1/molarMass()*IdealGas::R*temperature;
+                - 1.0/molarMass()*IdealGas::R*temperature;
     }
 
     /*!
@@ -212,9 +210,9 @@ public:
         double dmu, rho;
         double visco_CO2;
 
-        if(temperature < 275.) // regularisation
+        if(temperature < 275.0) // regularisation
         {
-            temperature = 275;
+            temperature = 275.0;
             Dune::dgrave << "Temperature below 275K in viscosity function:"
                     << "Regularizing tempereature to 275K. " << std::endl;
         }
@@ -236,8 +234,8 @@ public:
         rho = gasDensity(temperature, pressure); /* CO2 mass density [kg/m^3] */
 
         using Dune::power;
-        dmu = d11*rho + d21*rho*rho + d64*power(rho,6)/(TStar*TStar*TStar)
-            + d81*power(rho,8) + d82*power(rho,8)/TStar;
+        dmu = d11*rho + d21*rho*rho + d64*power(rho, 6)/(TStar*TStar*TStar)
+            + d81*power(rho, 8) + d82*power(rho, 8)/TStar;
 
         visco_CO2 = (mu0 + dmu)/1.0E6;   /* conversion to [Pa s] */
 
@@ -267,13 +265,10 @@ public:
      */
     static Scalar gasHeatCapacity(Scalar temperature, Scalar pressure)
     {
-        return 850;  //TODO!! from old simpleco2.hh file.
+        return 850.0;  //TODO!! from old simpleco2.hh file.
     }
 
 };
-
-template <class Scalar>
-const Scalar Components::SimpleCO2<Scalar>::R = Constants<Scalar>::R / Components::SimpleCO2<Scalar>::molarMass();
 
 } // end namespace Dumux::Components
 
