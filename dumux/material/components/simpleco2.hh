@@ -137,7 +137,7 @@ public:
      * \brief Returns true if the gas phase viscostiy is constant
      */
     static constexpr bool gasViscosityIsConstant()
-    { return true; }
+    { return false; }
 
     /*!
      * \brief The density \f$\mathrm{[kg/m^3]}\f$ of CO2 at a given pressure and temperature.
