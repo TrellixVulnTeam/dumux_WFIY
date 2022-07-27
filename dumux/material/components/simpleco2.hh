@@ -50,6 +50,8 @@ class SimpleCO2
 
     static const Scalar R;  // specific gas constant of CO2
 
+    static constexpr Scalar limitPressure = 10.0e5; // [Pa]
+
 public:
     /*!
      * \brief A human readable name for the CO2.
@@ -97,6 +99,8 @@ public:
     static const Scalar gasEnthalpy(Scalar temperature,
                                     Scalar pressure)
     {
+        if (pressure > limitPressure)
+            DUNE_THROW(Dune::RangeError, "Ideal gas law not applicable at pressure " << pressure);
         static const Scalar tRef = getParam<Scalar>("SimpleCO2.ReferenceTemperature", 293.15);
         return gasHeatCapacity(temperature, pressure)*(temperature - tRef); // + vaporizationEnthalpy();
     }
@@ -115,6 +119,8 @@ public:
     static const Scalar gasInternalEnergy(Scalar temperature,
                                           Scalar pressure)
     {
+        if (pressure > limitPressure)
+            DUNE_THROW(Dune::RangeError, "Ideal gas law not applicable at pressure " << pressure);
         // 1/molarMass: conversion from [J/(mol K)] to [J/(kg K)]
         // R*T/molarMass: pressure *spec. volume for an ideal gas
         return gasEnthalpy(temperature, pressure)
@@ -141,6 +147,8 @@ public:
      */
     static Scalar gasDensity(Scalar temperature, Scalar pressure)
     {
+        if (pressure > limitPressure)
+            DUNE_THROW(Dune::RangeError, "Ideal gas law not applicable at pressure " << pressure);
         // Assume an ideal gas
         return IdealGas::density(molarMass(), temperature, pressure);
     }
@@ -170,7 +178,10 @@ public:
     static Scalar gasPressure(Scalar temperature, Scalar density)
     {
         // Assume an ideal gas
-        return IdealGas::pressure(temperature, density/molarMass());
+        const Scalar pressure = IdealGas::pressure(temperature, density/molarMass());
+        if (pressure > limitPressure)
+            DUNE_THROW(Dune::RangeError, "Ideal gas law not applicable at pressure " << pressure);
+        return pressure;
     }
 
     /*!
