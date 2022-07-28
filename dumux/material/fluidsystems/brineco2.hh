@@ -36,6 +36,7 @@
 
 #include <dumux/material/components/brine.hh>
 #include <dumux/material/components/simpleco2.hh>
+#include <dumux/material/components/co2.hh>
 #include <dumux/material/components/tabulatedcomponent.hh>
 
 #include <dumux/material/binarycoefficients/brine_co2.hh>
@@ -46,7 +47,7 @@ namespace Dumux::FluidSystems::Detail {
 
     /*!
      * \brief Class that exports some indices that should
-     *        be provided by the BrineAir fluid system.
+     *        be provided by the BrineCO2 fluid system.
      *        The indices are chosen dependent on the policy,
      *        i.e. if a simplified pseudo component Brine is
      *        used or salt is considered an individual component.
@@ -115,8 +116,14 @@ class BrineCO2
     using ThisType = BrineCO2<Scalar, CO2Impl, H2OType, Policy>;
     using Base = Dumux::FluidSystems::Base<Scalar, ThisType>;
 
+    static constexpr bool rawCO2Table = Dumux::Deprecated::BrineCO2Helper<CO2Impl>::isRawTable();
+
+    using CO2Component = typename std::conditional_t< rawCO2Table,
+                                                      Components::CO2<Scalar, CO2Impl>,
+                                                      CO2Impl >;
+
     // binary coefficients
-    using Brine_CO2 = BinaryCoeff::Brine_CO2<Scalar, CO2Impl>;
+    using Brine_CO2 = BinaryCoeff::Brine_CO2<Scalar, CO2Component>;
 
     // use constant salinity brine?
     static constexpr bool useConstantSalinity = Policy::useConstantSalinity();
@@ -145,7 +152,7 @@ public:
 
     using H2O = H2OType;
     using Brine = BrineType;
-    using CO2 = CO2Impl;
+    using CO2 = CO2Component;
 
     static constexpr int numComponents = useConstantSalinity ? 2 : 3;
     static constexpr int numPhases = 2;
