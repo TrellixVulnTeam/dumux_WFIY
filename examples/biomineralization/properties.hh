@@ -94,7 +94,7 @@ template<class TypeTag>
 struct FluidSystem<TypeTag, TTag::MICPColumnSimpleChemistry>
 {
     using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-    using CO2Impl = Components::CO2<Scalar, BiomineralizationCO2Tables::CO2Tables>;
+    using CO2Impl = Components::SimpleCO2<Scalar>;
     using H2OTabulated = Components::TabulatedComponent<Components::H2O<Scalar>>;
     using type = Dumux::FluidSystems::BioMinSimpleChemistryFluid<Scalar, CO2Impl, H2OTabulated>;
 };
