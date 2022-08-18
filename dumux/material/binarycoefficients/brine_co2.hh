@@ -41,7 +41,12 @@ namespace Dumux::BinaryCoeff {
 template<class Scalar, class CO2Impl = Dumux::Components::SimpleCO2<Scalar>, bool verbose = true>
 class Brine_CO2 {
     using H2O = Dumux::Components::H2O<Scalar>;
-    using CO2 = CO2Impl;
+
+    static constexpr bool rawCO2Table = Dumux::Deprecated::BrineCO2Helper<CO2Impl>::isRawTable();
+    using CO2Component = typename std::conditional_t< rawCO2Table,
+                                                      Dumux::Components::CO2<Scalar, CO2Impl>,
+                                                      CO2Impl >;
+    using CO2 = CO2Component;
     using IdealGas = Dumux::IdealGas<Scalar>;
     static constexpr int lPhaseIdx = 0; // index of the liquid phase
     static constexpr int gPhaseIdx = 1; // index of the gas phase

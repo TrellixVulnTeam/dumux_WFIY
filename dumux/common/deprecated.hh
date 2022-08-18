@@ -282,7 +282,7 @@ template<class CO2Impl>
                                                                    CO2Impl >::value;
 
         template< typename T>
-        [[deprecated("Passing just CO2Tables to define a BrineCO2 fluidsystem is deprecated. Use Components::CO2<Scalar, CO2Tables> as template parameter instead.")]]
+        [[deprecated("Passing just CO2Tables to define a BrineCO2 fluidsystem/binarycoefficient is deprecated. Use Components::CO2<Scalar, CO2Tables> as template parameter instead.")]]
         static constexpr void DefiningBrineCO2WithCO2Table() {}
 
         static constexpr bool isRawTable()
