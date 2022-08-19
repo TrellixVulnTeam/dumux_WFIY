@@ -231,7 +231,7 @@ the volume fractions of biofilm and calcite increase:
 The density of the CO<sub>2</sub> phase is calculated using
 an ideal gas assumption as the pressures are low enough.
 The viscosity of the CO<sub>2</sub> phase is calculated using
-the relation given by [@Fenghour1998] respectively.
+the relation given by [@Fenghour1998].
 In these calculations, the effects of the small amounts of water and oxygen are neglected.
 The density and the viscosity of the aqueous phase are calculated
 according to [@Batzle1992] as a function of salinity.
