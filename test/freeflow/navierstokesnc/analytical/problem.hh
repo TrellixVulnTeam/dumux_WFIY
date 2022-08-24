@@ -122,41 +122,27 @@ public:
 
         if constexpr (ParentType::isMomentumProblem())
         {
-            if (globalPos[1] > this->gridGeometry().bBoxMax()[1] - 1e-6
-             || globalPos[0] > this->gridGeometry().bBoxMax()[0] - 1e-6
-             || globalPos[1] < this->gridGeometry().bBoxMin()[1] + 1e-6)
-            {
-                values.setNeumann(Indices::velocityXIdx);
-                values.setNeumann(Indices::velocityYIdx);
-            }
-            else
-            {
-                values.setDirichlet(Indices::velocityXIdx);
-                values.setDirichlet(Indices::velocityYIdx);
-            }
-        }
-        else
-        {
             if (useNeumann_)
             {
                 if (globalPos[1] > this->gridGeometry().bBoxMax()[1] - 1e-6
                 || globalPos[0] > this->gridGeometry().bBoxMax()[0] - 1e-6
                 || globalPos[1] < this->gridGeometry().bBoxMin()[1] + 1e-6)
                 {
-                    values.setNeumann(Indices::pressureIdx);
-                    values.setNeumann(Indices::conti0EqIdx + compIdx);
+                    values.setNeumann(Indices::velocityXIdx);
+                    values.setNeumann(Indices::velocityYIdx);
                 }
                 else
                 {
-                    values.setDirichlet(Indices::pressureIdx);
-                    values.setDirichlet(Indices::conti0EqIdx + compIdx);
+                    values.setDirichlet(Indices::velocityXIdx);
+                    values.setDirichlet(Indices::velocityYIdx);
                 }
             }
             else
-            {
-                values.setDirichlet(Indices::pressureIdx);
-                values.setDirichlet(Indices::conti0EqIdx + compIdx);
-            }
+                values.setAllDirichlet();
+        }
+        else
+        {
+            values.setAllDirichlet();
         }
 
         return values;
