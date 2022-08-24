@@ -169,7 +169,7 @@ public:
 
         if (constrainCell_)
         {
-            if (scv.dofIndex() == 15)
+            if (scv.dofIndex() == 0)
             {
                 values.set(Indices::pressureIdx);
                 values.set(Indices::conti0EqIdx + compIdx);
