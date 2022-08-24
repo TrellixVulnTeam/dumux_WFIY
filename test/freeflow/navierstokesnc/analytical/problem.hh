@@ -403,7 +403,7 @@ private:
     { return (v_(x,y) * dyU_(x,y)) + (u_(x,y) * dyV_(x,y)); }
 
     Scalar c_(Scalar x, Scalar y) const
-    { return (f3_(x) + f3_(y)) + 1; }
+    { return (f3_(x) + f3_(y)); }
 
     Scalar dxC_(Scalar x, Scalar) const
     { return df3_(x); }
